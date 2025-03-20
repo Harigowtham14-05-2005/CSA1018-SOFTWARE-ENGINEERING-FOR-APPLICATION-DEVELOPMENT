@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requirement Elicitation Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            transition: 0.3s;
+        }
+        .dark-mode {
+            background-color: #222;
+            color: #ddd;
+        }
+        .chat-container {
+            width: 40%;
+            max-width: 500px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            transition: 0.3s;
+        }
+        .dark-mode .chat-container {
+            background: #333;
+            color: white;
+        }
+        .chat-box {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            transition: 0.3s;
+        }
+        .dark-mode .chat-box {
+            background: #444;
+        }
+        .user-message, .bot-message {
+            max-width: 75%;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            display: inline-block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+        .bot-message {
+            background-color: #28a745;
+            color: white;
+            align-self: flex-start;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .input-container {
+            display: flex;
+            margin-top: 10px;
+            gap: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .typing-indicator {
+            display: none;
+            font-style: italic;
+            text-align: left;
+            margin-top: 5px;
+        }
+        .export-btn {
+            margin-top: 10px;
+            background: #28a745;
+        }
+        .export-btn:hover {
+            background: #1e7e34;
+        }
+        .dark-mode-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #000;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .mic-btn {
+            background: #dc3545;
+            padding: 12px;
+        }
+        .mic-btn:hover {
+            background: #a71d2a;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+
+    <div class="chat-container">
+        <h2 style="text-align: center;">Requirement Elicitation Chatbot</h2>
+        <div class="chat-box" id="chatBox"></div>
+        <p class="typing-indicator" id="typingIndicator">Bot is typing...</p>
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="Type your requirement..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+            <button class="mic-btn" onclick="startVoiceInput()">🎤</button>
+        </div>
+        <button class="export-btn" onclick="exportRequirement()">Export to Jira</button>
+    </div>
+
+    <script>
+        function sendMessage() {
+            let input = document.getElementById("userInput");
+            let message = input.value.trim();
+            if (message === "") return;
+
+            let chatBox = document.getElementById("chatBox");
+            let typingIndicator = document.getElementById("typingIndicator");
+
+            chatBox.innerHTML += `<p class="user-message">You: ${message}</p>`;
+            input.value = "";
+            typingIndicator.style.display = "block";
+
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                typingIndicator.style.display = "none";
+                typeBotMessage(data.response);
+            });
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function typeBotMessage(message) {
+            let chatBox = document.getElementById("chatBox");
+            let botMessage = document.createElement("p");
+            botMessage.className = "bot-message";
+            chatBox.appendChild(botMessage);
+
+            let i = 0;
+            function typeEffect() {
+                if (i < message.length) {
+                    botMessage.innerHTML += message.charAt(i);
+                    i++;
+                    setTimeout(typeEffect, 20);
+                }
+            }
+            typeEffect();
+        }
+
+        function exportRequirement() {
+            let chatBox = document.getElementById("chatBox");
+            let botMessages = [...chatBox.getElementsByClassName("bot-message")].map(m => m.innerText.replace("Bot: ", "")).join("\n");
+
+            fetch("/export", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requirement: botMessages })
+            })
+            .then(response => response.json())
+            .then(data => alert("Exported to Jira successfully!"));
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode");
+        }
+
+        function startVoiceInput() {
+            let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+            recognition.start();
+            recognition.onresult = function(event) {
+                document.getElementById("userInput").value = event.results[0][0].transcript;
+            };
+        }
+    </script>
+
+</body>
+</html>
